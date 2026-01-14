@@ -2,17 +2,17 @@ package org.k3cs1.subtitletranslatorapp.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.k3cs1.subtitletranslatorapp.exception.TranslationFailedException;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -34,28 +34,66 @@ public class TranslationJobService {
                 return output;
             } catch (Exception e) {
                 log.error(e.getMessage());
-                throw new RuntimeException("Translation failed: " + e.getMessage(), e);
+                throw new TranslationFailedException("Translation failed: " + e.getMessage());
             }
         }, executor);
     }
 
     private List<SrtEntry> translateAll(List<SrtEntry> entries) {
-        // Simple fixed-size batching; you can evolve to token-based batching later.
-        int batchSize = 30;
+        final int batchSize = 30;
 
-        Map<Integer, List<String>> translatedTextByIndex = new HashMap<>();
+        // Max parallel in-flight translation calls
+        final int maxParallel = 5;
 
+        // Thread-safe result map
+        final Map<Integer, List<String>> translatedTextByIndex = new ConcurrentHashMap<>();
+
+        // For progress reporting
+        final var done = new AtomicInteger(0);
+
+        // Concurrency limiter (even with virtual threads)
+        final var semaphore = new Semaphore(maxParallel);
+
+        // Build batch list first to avoid subList surprises and to count batches
+        final List<List<SrtEntry>> batches = new ArrayList<>();
         for (int i = 0; i < entries.size(); i += batchSize) {
-            List<SrtEntry> batch = entries.subList(i, Math.min(i + batchSize, entries.size()));
-            Map<Integer, List<String>> batchResult = translator.translateBatch(batch);
-
-            // Map each translated string back to SrtEntry lines
-
-            translatedTextByIndex.putAll(batchResult);
-
-            log.info("Translated {}/{} entries", Math.min(i + batchSize, entries.size()), entries.size());
+            batches.add(entries.subList(i, Math.min(i + batchSize, entries.size())));
         }
 
+        List<CompletableFuture<Void>> futures = new ArrayList<>(batches.size());
+
+        for (List<SrtEntry> batch : batches) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                try {
+                    semaphore.acquire();
+
+                    Map<Integer, List<String>> batchResult = translator.translateBatch(batch);
+                    translatedTextByIndex.putAll(batchResult);
+
+                    int finished = done.addAndGet(batch.size());
+                    log.info("Translated {}/{} entries", finished, entries.size());
+
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new TranslationFailedException(ie.getMessage());
+                } finally {
+                    semaphore.release();
+                }
+            }, executor)); // <-- your virtual-thread ExecutorService / Executor
+        }
+
+        // Wait for all batches to finish (propagate errors)
+        try {
+            CompletableFuture.allOf(
+                    futures.toArray(new CompletableFuture[0])
+            ).join();
+        } catch (CompletionException ce) {
+            // Unwrap to keep logs readable
+            Throwable root = ce.getCause() != null ? ce.getCause() : ce;
+            throw new TranslationFailedException("Parallel translation failed: " + root.getMessage());
+        }
+
+        // Reassemble in original order
         List<SrtEntry> out = new ArrayList<>(entries.size());
         for (SrtEntry e : entries) {
             List<String> lines = translatedTextByIndex.getOrDefault(e.index(), e.lines());
