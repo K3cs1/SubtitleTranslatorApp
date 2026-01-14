@@ -1,5 +1,7 @@
 package org.k3cs1.subtitletranslatorapp.service;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
 import org.springframework.stereotype.Service;
@@ -13,15 +15,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class TranslationJobService {
 
     private final SrtTranslatorService translator;
     private final ExecutorService executor;
-
-    public TranslationJobService(SrtTranslatorService translator, ExecutorService executor) {
-        this.translator = translator;
-        this.executor = executor;
-    }
 
     public CompletableFuture<Path> translateInBackground(Path input) {
         return CompletableFuture.supplyAsync(() -> {
@@ -34,6 +33,7 @@ public class TranslationJobService {
                 SrtIOParser.write(output, translated);
                 return output;
             } catch (Exception e) {
+                log.error(e.getMessage());
                 throw new RuntimeException("Translation failed: " + e.getMessage(), e);
             }
         }, executor);
@@ -53,7 +53,7 @@ public class TranslationJobService {
 
             translatedTextByIndex.putAll(batchResult);
 
-            System.out.printf("Translated %d/%d entries%n", Math.min(i + batchSize, entries.size()), entries.size());
+            log.info("Translated {}/{} entries", Math.min(i + batchSize, entries.size()), entries.size());
         }
 
         List<SrtEntry> out = new ArrayList<>(entries.size());
@@ -67,7 +67,7 @@ public class TranslationJobService {
     private Path outputPath(Path input) {
         String name = input.getFileName().toString();
         String base = name.endsWith(".srt") ? name.substring(0, name.length() - 4) : name;
-        String outName = base + "_eng.srt"; // as requested
+        String outName = base + "_hun.srt"; // as requested
         return input.getParent().resolve(outName);
     }
 }

@@ -25,7 +25,20 @@ public final class SrtIOParser {
                 break;
             }
 
-            int index = Integer.parseInt(all.get(i).trim());
+            String idxLine = all.get(i);
+
+            // Remove UTF-8 BOM if present and trim
+            idxLine = idxLine.replace("\uFEFF", "").trim();
+
+            // Some files include odd whitespace; keep only digits for the index line
+            idxLine = idxLine.replaceAll("[^0-9]", "");
+
+            if (idxLine.isEmpty()) {
+                throw new IllegalArgumentException("Invalid SRT index line at input line " + (i + 1) + ": '" + all.get(i) + "'");
+            }
+
+            int index = Integer.parseInt(idxLine);
+
             i++;
 
             String timeRange = all.get(i);
