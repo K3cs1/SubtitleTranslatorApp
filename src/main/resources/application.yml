@@ -1,0 +1,25 @@
+spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-5.2
+          temperature: 0.0
+    mcp:
+      client:
+        stdio:
+          connections:
+            deepl:
+              command: java
+              args:
+                - -jar
+                - C:/Users/pal.kecskemeti/IdeaProjects/SubtitleTranslatorApp/deepl-mcp-server/target/deepl-mcp-server-0.0.1-SNAPSHOT.jar
+              env:
+                DEEPL_API_KEY: ${DEEPL_API_KEY:DEEPL_API_KEY}
+
+  application:
+    name: SubtitleTranslatorApp
+deepl:
+  base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
+  auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
