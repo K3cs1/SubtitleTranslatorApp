@@ -2,8 +2,12 @@ package org.k3cs1.subtitletranslatorapp.service;
 
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.core.io.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,25 +19,19 @@ public class SrtTranslatorService {
 
     private final ChatClient chatClient;
 
+    @Value("classpath:system_message_prompt.md")
+    private Resource systemMessageResource;
+
     public SrtTranslatorService(ChatClient.Builder builder) {
         this.chatClient = builder.build();
     }
 
-    public Map<Integer, List<String>> translateBatch(List<SrtEntry> batch) {
+    public Map<Integer, List<String>> translateBatch(List<SrtEntry> batch) throws IOException {
         String payload = batch.stream()
                 .map(e -> "<<<ENTRY " + e.index() + ">>>\n" + e.originalText() + "\n<<<END>>>")
                 .collect(Collectors.joining("\n"));
 
-        String system = """
-                You are a professional subtitle translator.
-                Translate from English to Hungarian.
-                Rules:
-                - Do NOT change, remove, or reorder markers like <<<ENTRY n>>> and <<<END>>>.
-                - Return ONLY the translated text including the markers, nothing else.
-                - Preserve line breaks inside each entry as natural for subtitles.
-                - Keep punctuation and meaning faithful; avoid added explanations.
-                """;
-
+        String system = Files.readString(systemMessageResource.getFile().toPath());
         String user = "Translate this SRT text payload:\n\n" + payload;
 
         String response = chatClient.prompt()
@@ -50,7 +48,9 @@ public class SrtTranslatorService {
         Map<Integer, List<String>> out = new LinkedHashMap<>();
         String[] parts = response.split("<<<ENTRY ");
         for (String part : parts) {
-            if (part.isBlank()) continue;
+            if (part.isBlank()) {
+                continue;
+            }
             int close = part.indexOf(">>>");
             int idx = Integer.parseInt(part.substring(0, close).trim());
             String rest = part.substring(close + 3);

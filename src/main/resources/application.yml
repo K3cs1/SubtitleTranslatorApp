@@ -11,3 +11,6 @@ spring:
 deepl:
   base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
   auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
+translation:
+  batch-size: 30
+  max-parallel: 5

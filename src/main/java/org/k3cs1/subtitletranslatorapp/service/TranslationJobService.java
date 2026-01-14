@@ -5,8 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.k3cs1.subtitletranslatorapp.exception.TranslationFailedException;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,16 @@ public class TranslationJobService {
 
     private final SrtTranslatorService translator;
     private final ExecutorService executor;
+
+    @Value("${translation.batch-size}")
+    private int batchSize;
+
+    // Max parallel in-flight translation calls
+    @Value("${translation.max-parallel}")
+    private int maxParallel;
+
+    public static final String SRT_EXTENSION = ".srt";
+    public static final String HUN_SRT = "_hun.srt";
 
     public CompletableFuture<Path> translateInBackground(Path input) {
         return CompletableFuture.supplyAsync(() -> {
@@ -40,10 +52,6 @@ public class TranslationJobService {
     }
 
     private List<SrtEntry> translateAll(List<SrtEntry> entries) {
-        final int batchSize = 30;
-
-        // Max parallel in-flight translation calls
-        final int maxParallel = 5;
 
         // Thread-safe result map
         final Map<Integer, List<String>> translatedTextByIndex = new ConcurrentHashMap<>();
@@ -52,12 +60,12 @@ public class TranslationJobService {
         final var done = new AtomicInteger(0);
 
         // Concurrency limiter (even with virtual threads)
-        final var semaphore = new Semaphore(maxParallel);
+        final var semaphore = new Semaphore(this.maxParallel);
 
         // Build batch list first to avoid subList surprises and to count batches
         final List<List<SrtEntry>> batches = new ArrayList<>();
-        for (int i = 0; i < entries.size(); i += batchSize) {
-            batches.add(entries.subList(i, Math.min(i + batchSize, entries.size())));
+        for (int i = 0; i < entries.size(); i += this.batchSize) {
+            batches.add(entries.subList(i, Math.min(i + this.batchSize, entries.size())));
         }
 
         List<CompletableFuture<Void>> futures = new ArrayList<>(batches.size());
@@ -75,7 +83,11 @@ public class TranslationJobService {
 
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
+                    log.error(ie.getMessage());
                     throw new TranslationFailedException(ie.getMessage());
+                }catch (IOException ioe) {
+                    log.error(ioe.getMessage());
+                    throw new TranslationFailedException(ioe.getMessage());
                 } finally {
                     semaphore.release();
                 }
@@ -104,8 +116,8 @@ public class TranslationJobService {
 
     private Path outputPath(Path input) {
         String name = input.getFileName().toString();
-        String base = name.endsWith(".srt") ? name.substring(0, name.length() - 4) : name;
-        String outName = base + "_hun.srt"; // as requested
+        String base = name.endsWith(SRT_EXTENSION) ? name.substring(0, name.length() - 4) : name;
+        String outName = base + HUN_SRT; // as requested
         return input.getParent().resolve(outName);
     }
 }
