@@ -16,4 +16,4 @@ translation:
   max-parallel: 5
 logging:
   level:
-    root: debug  
+    root: warn

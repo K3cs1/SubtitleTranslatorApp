@@ -1,8 +1,8 @@
 package org.k3cs1.subtitletranslatorapp.service;
 
+import lombok.RequiredArgsConstructor;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -18,11 +18,10 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class SrtTranslatorServiceImpl implements SrtTranslatorService {
 
-    @Autowired
-    private ChatClient.Builder builder;
-
+    private final ChatClient.Builder builder;
     private ChatClient chatClient;
 
     @Value("classpath:system_message_prompt.md")

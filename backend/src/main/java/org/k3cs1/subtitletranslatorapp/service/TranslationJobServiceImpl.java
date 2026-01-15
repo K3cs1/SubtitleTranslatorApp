@@ -1,12 +1,11 @@
 package org.k3cs1.subtitletranslatorapp.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobRequest;
 import org.k3cs1.subtitletranslatorapp.exception.TranslationFailedException;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,14 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class TranslationJobServiceImpl implements TranslationJobService {
 
-    @Autowired
-    private SrtTranslatorService translator;
-
-    @Autowired
-    @Qualifier("translationExecutor")
-    private ExecutorService executor;
+    private final SrtTranslatorService translator;
+    private final ExecutorService executor;
 
     @Value("${translation.batch-size}")
     private int batchSize;
@@ -128,10 +124,7 @@ public class TranslationJobServiceImpl implements TranslationJobService {
         log.debug("Input name: {}", name);
         String base = name.endsWith(SRT_EXTENSION) ? name.substring(0, name.length() - 4) : name;
         String outName = base + HUN_SRT;
-        Path parent = normalizedInput.getParent();
-        if (parent == null) {
-            parent = Path.of(".");
-        }
-        return parent.resolve(outName);
+        Path userHome = Path.of(System.getProperty("user.home"));
+        return userHome.resolve(outName);
     }
 }

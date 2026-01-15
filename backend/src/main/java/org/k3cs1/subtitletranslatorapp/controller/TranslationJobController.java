@@ -1,11 +1,11 @@
 package org.k3cs1.subtitletranslatorapp.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.k3cs1.subtitletranslatorapp.api.ApiResponse;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobRequest;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobResponse;
 import org.k3cs1.subtitletranslatorapp.exception.GlobalExceptionHandler;
 import org.k3cs1.subtitletranslatorapp.service.TranslationJobService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,10 +20,10 @@ import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/api/translation-jobs")
+@RequiredArgsConstructor
 public class TranslationJobController {
 
-    @Autowired
-    private TranslationJobService translationJobService;
+    private final TranslationJobService translationJobService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<?>> createTranslationJob(

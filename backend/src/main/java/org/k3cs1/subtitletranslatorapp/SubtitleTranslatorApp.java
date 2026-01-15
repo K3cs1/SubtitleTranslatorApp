@@ -1,17 +1,8 @@
 package org.k3cs1.subtitletranslatorapp;
 
 import lombok.extern.slf4j.Slf4j;
-import org.k3cs1.subtitletranslatorapp.dto.TranslationJobRequest;
-import org.k3cs1.subtitletranslatorapp.service.TranslationJobService;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Scanner;
 
 @SpringBootApplication
 @Slf4j

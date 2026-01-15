@@ -1,20 +1,21 @@
 package org.k3cs1.subtitletranslatorapp.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import jakarta.annotation.PostConstruct;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class DeeplTranslatorServiceImpl implements DeeplTranslatorService {
 
-    @Autowired
-    private RestClient.Builder builder;
+    private final RestClient.Builder builder;
 
     @Value("${deepl.base-url}")
     private String deeplBaseUrl;
@@ -54,6 +55,9 @@ public class DeeplTranslatorServiceImpl implements DeeplTranslatorService {
                 .toList();
     }
 
-    record DeepLResponse(List<Translation> translations) {}
-    record Translation(String text) {}
+    record DeepLResponse(List<Translation> translations) {
+    }
+
+    record Translation(String text) {
+    }
 }
