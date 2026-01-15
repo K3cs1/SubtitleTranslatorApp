@@ -8,4 +8,5 @@ COPY app.jar app.jar
 ENV PORT=5000
 
 EXPOSE 5000
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Force-bind to $PORT (default 5000) at JVM level to avoid any port/proxy mismatch.
+ENTRYPOINT ["sh", "-c", "exec java -Dserver.port=${PORT:-5000} -jar /app/app.jar"]
