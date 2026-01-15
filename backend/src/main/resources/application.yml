@@ -10,7 +10,8 @@ spring:
     name: SubtitleTranslatorApp
 
 server:
-  port: ${PORT:8080}
+  port: ${PORT:5000}
+  address: 0.0.0.0
 deepl:
   base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
   auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
