@@ -8,6 +8,9 @@ spring:
           temperature: 0.0
   application:
     name: SubtitleTranslatorApp
+
+server:
+  port: ${PORT:8080}
 deepl:
   base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
   auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
