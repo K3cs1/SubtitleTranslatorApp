@@ -69,6 +69,30 @@ The workflow file is: `.github/workflows/deploy-backend-eb.yml`.
 It runs on pushes to `main` that touch backend files, or manually via
 `workflow_dispatch`.
 
+## Deploy UI to AWS (S3 + optional CloudFront)
+
+This repository includes a GitHub Actions workflow that builds the Vite UI and deploys the generated static files (`UI/dist`) to an S3 bucket.
+
+### One-time AWS setup
+
+1. Create an S3 bucket to host the UI (static website hosting is optional if you front it with CloudFront).
+2. (Optional, recommended) Create a CloudFront distribution with the S3 bucket as origin.
+
+### GitHub repository secrets
+
+Add these secrets to your GitHub repo:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `UI_S3_BUCKET` (target bucket name)
+- `VITE_API_BASE_URL` (backend base URL, e.g. `http://localhost:8080` or your Elastic Beanstalk URL)
+- `CLOUDFRONT_DISTRIBUTION_ID` (optional; if set, the workflow invalidates `/*`)
+
+The workflow file is: `.github/workflows/deploy-ui-s3.yml`.
+It runs on pushes to `main` that touch UI files, or manually via
+`workflow_dispatch`.
+
 ## Start the frontend locally
 
 From the `UI` folder:
