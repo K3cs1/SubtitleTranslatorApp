@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,14 +32,16 @@ public class SrtTranslatorService {
                 .map(e -> "<<<ENTRY " + e.index() + ">>>\n" + e.originalText() + "\n<<<END>>>")
                 .collect(Collectors.joining("\n"));
 
-        String system = Files.readString(systemMessageResource.getFile().toPath());
+        String system = Objects.requireNonNull(
+                Files.readString(systemMessageResource.getFile().toPath()),
+                "System prompt is null");
         String user = "Translate this SRT text payload:\n\n" + payload;
 
-        String response = chatClient.prompt()
+        String response = Objects.requireNonNull(chatClient.prompt()
                 .system(system)
                 .user(user)
                 .call()
-                .content();
+                .content(), "Chat response content is null");
 
         return parseTranslatedPayload(response);
     }

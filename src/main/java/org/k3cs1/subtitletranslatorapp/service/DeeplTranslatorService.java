@@ -6,6 +6,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class DeeplTranslatorService {
@@ -17,7 +18,7 @@ public class DeeplTranslatorService {
                                   @Value("${deepl.base-url}") String deeplBaseUrl,
                                   @Value("${deepl.auth-key}") String authKey) {
         this.restClient = builder
-                .baseUrl(deeplBaseUrl)
+                .baseUrl(Objects.requireNonNull(deeplBaseUrl, "deepl.base-url is required"))
                 .build();
 
         this.authKey = authKey;
@@ -33,14 +34,12 @@ public class DeeplTranslatorService {
                 "target_lang", "HU"
         );
 
-        var response = restClient.post()
+        var response = Objects.requireNonNull(restClient.post()
                 .uri("/v2/translate")
                 .header("Authorization", "DeepL-Auth-Key " + authKey)
-                .body(body)
+                .body(Objects.requireNonNull(body, "DeepL request body is null"))
                 .retrieve()
-                .body(DeepLResponse.class);
-
-        assert response != null;
+                .body(DeepLResponse.class), "DeepL response body is null");
         return response.translations().stream()
                 .map(Translation::text)
                 .toList();
