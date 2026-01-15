@@ -38,6 +38,37 @@ Environment variables used by the backend:
 
 The backend starts on `http://localhost:8080` by default.
 
+## Deploy backend to AWS Elastic Beanstalk
+
+This repository includes a GitHub Actions workflow that builds the backend and
+deploys it to Elastic Beanstalk using the Docker platform.
+
+### One-time AWS setup
+
+1. Create an Elastic Beanstalk application and environment:
+   - Platform: **Docker** (64bit Amazon Linux 2023)
+   - Instance profile should allow EB to read from the S3 bucket used for deployments.
+2. Create an S3 bucket for application versions.
+3. Configure backend environment variables in the EB environment:
+   - `OPENAI_API_KEY` (required)
+   - `DEEPL_API_KEY` (required)
+   - `DEEPL_BASE_URL` (optional, defaults to `https://api-free.deepl.com`)
+
+### GitHub repository secrets
+
+Add these secrets to your GitHub repo:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `EB_APP_NAME`
+- `EB_ENV_NAME`
+- `EB_S3_BUCKET`
+
+The workflow file is: `.github/workflows/deploy-backend-eb.yml`.
+It runs on pushes to `main` that touch backend files, or manually via
+`workflow_dispatch`.
+
 ## Start the frontend locally
 
 From the `UI` folder:
