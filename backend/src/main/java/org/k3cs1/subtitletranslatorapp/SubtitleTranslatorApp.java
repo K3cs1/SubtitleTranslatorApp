@@ -9,7 +9,31 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class SubtitleTranslatorApp {
 
     public static void main(String[] args) {
+        ensureNonBlankExternalApiKeys();
         SpringApplication.run(SubtitleTranslatorApp.class, args);
+    }
+
+    /**
+     * Elastic Beanstalk env vars can be present-but-empty.
+     * Spring AI (OpenAI) fails-fast if the resolved key is blank, preventing the web server from starting,
+     * which then causes Nginx upstream 502 (connection refused).
+     *
+     * We force a non-blank property so the application can start and serve health endpoints;
+     * translation will still fail until valid secrets are configured.
+     */
+    private static void ensureNonBlankExternalApiKeys() {
+        ensureNonBlankPropertyFromEnv("OPENAI_API_KEY", "spring.ai.openai.api-key", "DUMMY_OPENAI_API_KEY");
+    }
+
+    private static void ensureNonBlankPropertyFromEnv(String envVarName, String propertyName, String fallbackValue) {
+        String raw = System.getenv(envVarName);
+        if (raw != null && raw.isBlank()) {
+            // System properties override application.yml/env and are available during auto-configuration.
+            if (System.getProperty(propertyName) == null) {
+                System.setProperty(propertyName, fallbackValue);
+                log.warn("{} is set but blank. Using a dummy value for {} so the app can start.", envVarName, propertyName);
+            }
+        }
     }
 
 //    @Bean

@@ -9,7 +9,8 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,9 +39,13 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
                 .map(e -> "<<<ENTRY " + e.index() + ">>>\n" + e.originalText() + "\n<<<END>>>")
                 .collect(Collectors.joining("\n"));
 
-        String system = Objects.requireNonNull(
-                Files.readString(systemMessageResource.getFile().toPath()),
-                "System prompt is null");
+        // Resource#getFile() breaks when running from a packaged jar. Always read via stream.
+        String system;
+        try (InputStream in = systemMessageResource.getInputStream()) {
+            system = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        system = Objects.requireNonNull(system, "System prompt is null");
+
         String user = "Translate this SRT text payload:\n\n" + payload;
 
         String response = Objects.requireNonNull(chatClient.prompt()

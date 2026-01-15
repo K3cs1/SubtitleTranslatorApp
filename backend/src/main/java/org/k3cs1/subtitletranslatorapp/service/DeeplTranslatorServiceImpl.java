@@ -1,6 +1,7 @@
 package org.k3cs1.subtitletranslatorapp.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -13,6 +14,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DeeplTranslatorServiceImpl implements DeeplTranslatorService {
 
     private final RestClient.Builder builder;
@@ -30,14 +32,17 @@ public class DeeplTranslatorServiceImpl implements DeeplTranslatorService {
         this.restClient = builder
                 .baseUrl(Objects.requireNonNull(deeplBaseUrl, "deepl.base-url is required"))
                 .build();
-
         if (authKey == null || authKey.isBlank()) {
-            throw new IllegalStateException("DEEPL_API_KEY is required");
+            // Don’t crash the whole app on startup; fail when translation is requested instead.
+            log.warn("DEEPL_API_KEY is missing/blank. DeepL translation will be unavailable until configured.");
         }
     }
 
     @Override
     public List<String> translateEnToHu(List<String> texts) {
+        if (authKey == null || authKey.isBlank()) {
+            throw new IllegalStateException("DEEPL_API_KEY is required");
+        }
         var body = Map.of(
                 "text", texts,
                 "source_lang", "EN",
