@@ -1,0 +1,19 @@
+spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-5.2
+          temperature: 0.0
+  application:
+    name: SubtitleTranslatorApp
+deepl:
+  base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
+  auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
+translation:
+  batch-size: 30
+  max-parallel: 5
+logging:
+  level:
+    root: debug  
