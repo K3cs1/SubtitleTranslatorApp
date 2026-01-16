@@ -7,18 +7,7 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState('')
   const [downloadName, setDownloadName] = useState('')
-  const apiBaseUrlRaw = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-  const apiBaseUrl = (() => {
-    if (!apiBaseUrlRaw) {
-      return ''
-    }
-
-    if (window.location.protocol === 'https:' && apiBaseUrlRaw.startsWith('http://')) {
-      return apiBaseUrlRaw.replace(/^http:\/\//, 'https://')
-    }
-
-    return apiBaseUrlRaw
-  })()
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] ?? null
