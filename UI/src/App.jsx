@@ -5,7 +5,18 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+  const apiBaseUrlRaw = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+  const apiBaseUrl = (() => {
+    if (!apiBaseUrlRaw) {
+      return ''
+    }
+
+    if (window.location.protocol === 'https:' && apiBaseUrlRaw.startsWith('http://')) {
+      return apiBaseUrlRaw.replace(/^http:\/\//, 'https://')
+    }
+
+    return apiBaseUrlRaw
+  })()
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] ?? null
