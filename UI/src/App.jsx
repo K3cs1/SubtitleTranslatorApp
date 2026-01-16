@@ -5,6 +5,8 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [downloadUrl, setDownloadUrl] = useState('')
+  const [downloadName, setDownloadName] = useState('')
   const apiBaseUrlRaw = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
   const apiBaseUrl = (() => {
     if (!apiBaseUrlRaw) {
@@ -22,6 +24,22 @@ function App() {
     const file = event.target.files?.[0] ?? null
     setSelectedFile(file)
     setStatusMessage('')
+    if (downloadUrl) {
+      URL.revokeObjectURL(downloadUrl)
+      setDownloadUrl('')
+      setDownloadName('')
+    }
+  }
+
+  const createBlobUrlFromBase64 = (base64, contentType) => {
+    const binary = window.atob(base64)
+    const length = binary.length
+    const bytes = new Uint8Array(length)
+    for (let i = 0; i < length; i += 1) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    const blob = new Blob([bytes], { type: contentType })
+    return URL.createObjectURL(blob)
   }
 
   const handleStartTranslation = async () => {
@@ -34,6 +52,11 @@ function App() {
 
     setIsSubmitting(true)
     setStatusMessage('Starting translation...')
+    if (downloadUrl) {
+      URL.revokeObjectURL(downloadUrl)
+      setDownloadUrl('')
+      setDownloadName('')
+    }
 
     try {
       const response = await fetch(`${apiBaseUrl}/api/translation-jobs`, {
@@ -47,8 +70,18 @@ function App() {
         throw new Error(errorMessage)
       }
 
-      const apiMessage = payload?.message || 'Translation started.'
-      setStatusMessage(apiMessage)
+      const apiMessage = payload?.message || 'Translation completed.'
+      const contentBase64 = payload?.data?.contentBase64
+      const outputFileName = payload?.data?.outputFileName || 'translated.srt'
+
+      if (contentBase64) {
+        const blobUrl = createBlobUrlFromBase64(contentBase64, 'application/x-subrip')
+        setDownloadUrl(blobUrl)
+        setDownloadName(outputFileName)
+        setStatusMessage('Translation completed. Download ready.')
+      } else {
+        setStatusMessage(apiMessage)
+      }
     } catch (error) {
       setStatusMessage(error.message || 'Failed to start translation.')
     } finally {
@@ -88,6 +121,13 @@ function App() {
           </span>
         </div>
         {statusMessage ? <p className="status-message">{statusMessage}</p> : null}
+        {downloadUrl ? (
+          <div className="download-row">
+            <a className="secondary-button" href={downloadUrl} download={downloadName}>
+              Download translated file
+            </a>
+          </div>
+        ) : null}
       </section>
     </div>
   )

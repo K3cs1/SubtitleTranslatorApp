@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Objects;
 
 @RestController
@@ -29,6 +30,8 @@ public class TranslationJobController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<?>> createTranslationJob(
             @RequestParam("file") MultipartFile file) {
+        Path tempFile = null;
+        Path output = null;
         try {
             if (file == null || file.isEmpty()) {
                 throw new IllegalArgumentException("Subtitle file is required.");
@@ -39,19 +42,42 @@ public class TranslationJobController {
                 throw new IllegalArgumentException("Only .srt files are supported.");
             }
 
-            Path tempFile = Files.createTempFile("subtitle-", ".srt");
+            tempFile = Files.createTempFile("subtitle-", ".srt");
             file.transferTo(Objects.requireNonNull(tempFile.toFile(), "Temp file must not be null"));
 
             TranslationJobRequest request = new TranslationJobRequest(tempFile);
-            translationJobService.translateInBackground(request);
+            output = translationJobService.translateInBackground(request).join();
+            byte[] translatedBytes = Files.readAllBytes(output);
+            String contentBase64 = Base64.getEncoder().encodeToString(translatedBytes);
+            String outputFileName = outputFileNameForOriginal(originalName);
 
-            TranslationJobResponse response = new TranslationJobResponse(originalName);
-            ApiResponse<?> apiResponse = ApiResponse.success("Translation started.", response);
+            TranslationJobResponse response = new TranslationJobResponse(originalName, outputFileName, contentBase64);
+            ApiResponse<?> apiResponse = ApiResponse.success("Translation completed.", response);
             return ResponseEntity.ok(apiResponse);
         } catch (IllegalArgumentException ex) {
             return GlobalExceptionHandler.errorResponseEntity(ex.getMessage(), HttpStatus.BAD_REQUEST);
         } catch (Exception ex) {
             return GlobalExceptionHandler.errorResponseEntity("Failed to start translation.", HttpStatus.INTERNAL_SERVER_ERROR);
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ignored) {
+                }
+            }
+            if (output != null) {
+                try {
+                    Files.deleteIfExists(output);
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
+
+    private String outputFileNameForOriginal(String originalName) {
+        String lower = originalName.toLowerCase();
+        String base = lower.endsWith(".srt") ? originalName.substring(0, originalName.length() - 4) : originalName;
+        return base + "_hun.srt";
+    }
+
 }
