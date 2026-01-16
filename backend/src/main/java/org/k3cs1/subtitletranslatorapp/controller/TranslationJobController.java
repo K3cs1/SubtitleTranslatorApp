@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/translation-jobs")
@@ -39,7 +40,7 @@ public class TranslationJobController {
             }
 
             Path tempFile = Files.createTempFile("subtitle-", ".srt");
-            file.transferTo(tempFile);
+            file.transferTo(Objects.requireNonNull(tempFile.toFile(), "Temp file must not be null"));
 
             TranslationJobRequest request = new TranslationJobRequest(tempFile);
             translationJobService.translateInBackground(request);
