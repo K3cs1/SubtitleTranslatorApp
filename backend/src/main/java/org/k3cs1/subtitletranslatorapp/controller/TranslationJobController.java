@@ -28,6 +28,7 @@ import java.util.Objects;
 public class TranslationJobController {
 
     private final TranslationJobService translationJobService;
+    private static final long MAX_UPLOAD_BYTES = 2L * 1024L * 1024L; // 2 MB
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<?>> createTranslationJob(
@@ -38,6 +39,9 @@ public class TranslationJobController {
         try {
             if (file == null || file.isEmpty()) {
                 throw new InvalidArgumentException("Subtitle file is required.");
+            }
+            if (file.getSize() > MAX_UPLOAD_BYTES) {
+                throw new InvalidArgumentException("Subtitle file must be 2 MB or smaller.");
             }
             if (targetLanguage == null || targetLanguage.isBlank()) {
                 throw new InvalidArgumentException("Target language is required.");
