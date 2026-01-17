@@ -30,6 +30,7 @@ build/
 !**/src/test/**/build/
 
 ### Frontend ###
+UI/node/
 UI/node_modules/
 UI/dist/
 
