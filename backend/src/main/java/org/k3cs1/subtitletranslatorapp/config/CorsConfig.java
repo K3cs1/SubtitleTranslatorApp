@@ -11,13 +11,14 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(@NonNull CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins(
+                // CloudFront distributions change frequently; allow CloudFront origins broadly.
+                // We don't use cookies/session auth, so credentials are not needed.
+                .allowedOriginPatterns(
                         "http://localhost:5173",
-                        "https://d1yzzvrnimz8tw.cloudfront.net",
-                        "https://dy455l8ky4gpi.cloudfront.net"
+                        "https://*.cloudfront.net"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true);
+                .allowCredentials(false);
     }
 }
