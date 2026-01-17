@@ -106,11 +106,18 @@ function App() {
       const response = await fetch(`${apiBaseUrl}/api/translation-jobs`, {
         method: 'POST',
         body: formData,
+        // Don't set Content-Type header; browser sets it automatically with boundary for FormData
       })
+
+      // Handle network/CORS errors (response is null/undefined or fetch throws)
+      if (!response) {
+        throw new Error('Network error: Could not reach the server. Check your connection and try again.')
+      }
 
       const payload = await response.json().catch(() => null)
       if (!response.ok) {
-        const errorMessage = payload?.message || 'Failed to start translation.'
+        // If we got a response but it's not OK, show the API error message
+        const errorMessage = payload?.message || `Server error (${response.status}). Please try again.`
         throw new Error(errorMessage)
       }
 

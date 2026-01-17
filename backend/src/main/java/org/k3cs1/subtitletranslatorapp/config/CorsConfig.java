@@ -21,6 +21,7 @@ public class CorsConfig {
         config.setAllowCredentials(false);
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:5173",
+                "http://127.0.0.1:5173",
                 "https://*.cloudfront.net"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
