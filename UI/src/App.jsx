@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import './App.css'
 
 function App() {
@@ -11,6 +11,9 @@ function App() {
   const [countriesStatus, setCountriesStatus] = useState('loading')
   const [countriesError, setCountriesError] = useState('')
   const [targetLanguage, setTargetLanguage] = useState('')
+  const [jobId, setJobId] = useState(null)
+  const [jobStatus, setJobStatus] = useState(null)
+  const pollingIntervalRef = useRef(null)
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
   useEffect(() => {
@@ -56,10 +59,79 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBaseUrl])
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [])
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+  }
+
+  const pollJobStatus = async (id) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/translation-jobs/${id}`, {
+        method: 'GET',
+      })
+
+      if (!response) {
+        throw new Error('Network error: Could not reach the server.')
+      }
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        const errorMessage = payload?.message || `Server error (${response.status}).`
+        throw new Error(errorMessage)
+      }
+
+      const jobStatusData = payload?.data
+      if (jobStatusData) {
+        setJobStatus(jobStatusData.status)
+        
+        if (jobStatusData.status === 'COMPLETED') {
+          stopPolling()
+          setIsSubmitting(false)
+          
+          if (jobStatusData.contentBase64) {
+            const blobUrl = createBlobUrlFromBase64(jobStatusData.contentBase64, 'application/x-subrip')
+            setDownloadUrl(blobUrl)
+            setDownloadName(jobStatusData.outputFileName || 'translated.srt')
+            setStatusMessage('Translation completed. Download ready.')
+          } else {
+            setStatusMessage('Translation completed, but no content available.')
+          }
+        } else if (jobStatusData.status === 'FAILED') {
+          stopPolling()
+          setIsSubmitting(false)
+          setStatusMessage(jobStatusData.errorMessage || 'Translation failed.')
+        } else if (jobStatusData.status === 'PROCESSING') {
+          setStatusMessage('Translation in progress...')
+        } else if (jobStatusData.status === 'PENDING') {
+          setStatusMessage('Translation job queued...')
+        }
+      }
+    } catch (error) {
+      stopPolling()
+      setIsSubmitting(false)
+      setStatusMessage(error.message || 'Failed to check job status.')
+    }
+  }
+
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] ?? null
     setSelectedFile(file)
     setStatusMessage('')
+    setJobId(null)
+    setJobStatus(null)
+    stopPolling()
     if (downloadUrl) {
       URL.revokeObjectURL(downloadUrl)
       setDownloadUrl('')
@@ -96,6 +168,9 @@ function App() {
 
     setIsSubmitting(true)
     setStatusMessage('Starting translation...')
+    setJobId(null)
+    setJobStatus(null)
+    stopPolling()
     if (downloadUrl) {
       URL.revokeObjectURL(downloadUrl)
       setDownloadUrl('')
@@ -115,12 +190,32 @@ function App() {
       }
 
       const payload = await response.json().catch(() => null)
+      
+      // Handle 202 Accepted (async job created)
+      if (response.status === 202) {
+        const newJobId = payload?.data?.jobId
+        if (newJobId) {
+          setJobId(newJobId)
+          setStatusMessage('Translation job created. Processing...')
+          
+          // Start polling immediately, then every 2 seconds
+          pollJobStatus(newJobId)
+          pollingIntervalRef.current = setInterval(() => {
+            pollJobStatus(newJobId)
+          }, 2000)
+        } else {
+          throw new Error('Job created but no job ID received.')
+        }
+        return
+      }
+
+      // Handle other responses (for backward compatibility if needed)
       if (!response.ok) {
-        // If we got a response but it's not OK, show the API error message
         const errorMessage = payload?.message || `Server error (${response.status}). Please try again.`
         throw new Error(errorMessage)
       }
 
+      // Legacy synchronous response handling (shouldn't happen with new backend)
       const apiMessage = payload?.message || 'Translation completed.'
       const contentBase64 = payload?.data?.contentBase64
       const outputFileName = payload?.data?.outputFileName || 'translated.srt'
@@ -133,10 +228,11 @@ function App() {
       } else {
         setStatusMessage(apiMessage)
       }
-    } catch (error) {
-      setStatusMessage(error.message || 'Failed to start translation.')
-    } finally {
       setIsSubmitting(false)
+    } catch (error) {
+      stopPolling()
+      setIsSubmitting(false)
+      setStatusMessage(error.message || 'Failed to start translation.')
     }
   }
 
@@ -186,7 +282,9 @@ function App() {
             onClick={handleStartTranslation}
             disabled={!selectedFile || isSubmitting || countriesStatus !== 'ready' || !targetLanguage}
           >
-            {isSubmitting ? 'Starting...' : 'Start translation'}
+            {isSubmitting 
+              ? (jobStatus === 'PROCESSING' ? 'Translating...' : jobStatus === 'PENDING' ? 'Queued...' : 'Starting...')
+              : 'Start translation'}
           </button>
           <span className="file-name">
             {selectedFile ? selectedFile.name : 'No file selected'}
