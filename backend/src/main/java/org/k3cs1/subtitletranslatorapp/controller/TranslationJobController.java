@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.k3cs1.subtitletranslatorapp.api.ApiResponse;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobRequest;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobResponse;
+import org.k3cs1.subtitletranslatorapp.exception.InvalidArgumentException;
 import org.k3cs1.subtitletranslatorapp.exception.GlobalExceptionHandler;
+import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
 import org.k3cs1.subtitletranslatorapp.service.TranslationJobService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -34,16 +36,19 @@ public class TranslationJobController {
         Path output = null;
         try {
             if (file == null || file.isEmpty()) {
-                throw new IllegalArgumentException("Subtitle file is required.");
+                throw new InvalidArgumentException("Subtitle file is required.");
             }
 
             String originalName = file.getOriginalFilename();
             if (originalName == null || !originalName.toLowerCase().endsWith(".srt")) {
-                throw new IllegalArgumentException("Only .srt files are supported.");
+                throw new InvalidArgumentException("Only .srt files are supported.");
             }
 
             tempFile = Files.createTempFile("subtitle-", ".srt");
             file.transferTo(Objects.requireNonNull(tempFile.toFile(), "Temp file must not be null"));
+
+            // Content-based validation (reject renamed non-SRT files)
+            SrtIOParser.validateSrtContent(tempFile);
 
             TranslationJobRequest request = new TranslationJobRequest(tempFile);
             output = translationJobService.translateInBackground(request).join();
