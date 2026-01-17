@@ -70,6 +70,24 @@
   background: #f8fafc;
 }
 
+.file-picker select {
+  padding: 0.7rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.file-picker select:disabled {
+  color: #64748b;
+}
+
+.field-error {
+  color: #b91c1c;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
 .action-row {
   margin-top: 1.5rem;
   display: flex;

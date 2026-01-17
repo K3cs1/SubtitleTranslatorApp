@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
 function App() {
@@ -7,7 +7,54 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState('')
   const [downloadName, setDownloadName] = useState('')
+  const [countryOptions, setCountryOptions] = useState([])
+  const [countriesStatus, setCountriesStatus] = useState('loading')
+  const [countriesError, setCountriesError] = useState('')
+  const [targetLanguage, setTargetLanguage] = useState('')
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadCountries = async () => {
+      if (!apiBaseUrl) {
+        setCountriesStatus('error')
+        setCountriesError('VITE_API_BASE_URL is not configured.')
+        return
+      }
+
+      setCountriesStatus('loading')
+      setCountriesError('')
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/reference/countries`, { method: 'GET' })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) {
+          const errorMessage = payload?.message || 'Failed to load countries.'
+          throw new Error(errorMessage)
+        }
+
+        const options = Array.isArray(payload?.data) ? payload.data : []
+        if (!isCancelled) {
+          setCountryOptions(options)
+          setCountriesStatus('ready')
+          if (!targetLanguage && options.length > 0) {
+            setTargetLanguage(options[0].code)
+          }
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setCountriesStatus('error')
+          setCountriesError(error.message || 'Failed to load countries.')
+        }
+      }
+    }
+
+    loadCountries()
+    return () => {
+      isCancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiBaseUrl])
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0] ?? null
@@ -95,6 +142,27 @@ function App() {
         <label className="file-picker" htmlFor="srt-file">
           <span className="file-picker__label">Subtitle file</span>
           <input id="srt-file" name="srt-file" type="file" accept=".srt" onChange={handleFileChange} />
+        </label>
+        <label className="file-picker" htmlFor="target-language">
+          <span className="file-picker__label">Target language</span>
+          <select
+            id="target-language"
+            name="target-language"
+            value={targetLanguage}
+            onChange={(event) => setTargetLanguage(event.target.value)}
+            disabled={countriesStatus !== 'ready'}
+          >
+            {countriesStatus === 'loading' ? <option value="">Loading…</option> : null}
+            {countriesStatus === 'error' ? <option value="">Failed to load</option> : null}
+            {countriesStatus === 'ready'
+              ? countryOptions.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.name}
+                  </option>
+                ))
+              : null}
+          </select>
+          {countriesError ? <span className="field-error">{countriesError}</span> : null}
         </label>
         <div className="action-row">
           <button
