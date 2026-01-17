@@ -34,7 +34,10 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
     }
 
     @Override
-    public Map<Integer, List<String>> translateBatch(List<SrtEntry> batch) throws IOException {
+    public Map<Integer, List<String>> translateBatch(List<SrtEntry> batch, String targetLanguage) throws IOException {
+        if (targetLanguage == null || targetLanguage.isBlank()) {
+            throw new IllegalArgumentException("Target language is required.");
+        }
         String payload = batch.stream()
                 .map(e -> "<<<ENTRY " + e.index() + ">>>\n" + e.originalText() + "\n<<<END>>>")
                 .collect(Collectors.joining("\n"));
@@ -45,6 +48,7 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
             system = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
         system = Objects.requireNonNull(system, "System prompt is null");
+        system = system.replace("{{TARGET_LANGUAGE}}", targetLanguage.trim());
 
         String user = "Translate this SRT text payload:\n\n" + payload;
 

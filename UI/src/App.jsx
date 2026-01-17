@@ -79,12 +79,20 @@ function App() {
   }
 
   const handleStartTranslation = async () => {
+    const selectedTarget = countryOptions.find((option) => option.code === targetLanguage) || null
+    const targetLanguageName = selectedTarget?.name || ''
+
     if (!selectedFile || isSubmitting) {
+      return
+    }
+    if (!targetLanguageName) {
+      setStatusMessage('Please select a target language.')
       return
     }
 
     const formData = new FormData()
     formData.append('file', selectedFile)
+    formData.append('targetLanguage', targetLanguageName)
 
     setIsSubmitting(true)
     setStatusMessage('Starting translation...')
@@ -169,7 +177,7 @@ function App() {
             className="primary-button"
             type="button"
             onClick={handleStartTranslation}
-            disabled={!selectedFile || isSubmitting}
+            disabled={!selectedFile || isSubmitting || countriesStatus !== 'ready' || !targetLanguage}
           >
             {isSubmitting ? 'Starting...' : 'Start translation'}
           </button>

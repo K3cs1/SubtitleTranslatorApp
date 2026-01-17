@@ -1,5 +1,39 @@
 # SubtitleTranslatorApp
 
+Translate `.srt` subtitles via a Spring Boot backend and a React (Vite) UI.
+
+## How it works (high level)
+
+- **UI**: Uploads an `.srt` file and sends the selected **Target language** to the backend.
+- **Backend**:
+  - Validates and parses the `.srt`
+  - Calls the ChatGPT API (Spring AI OpenAI) to translate subtitle entries into the selected target language
+  - Returns the translated `.srt` content (base64) so the UI can offer it for download
+- **Reference data**: The “Target language” combo is populated from the World Bank Countries API via a backend proxy endpoint.
+
+## API endpoints
+
+- **List countries for the UI combo**
+  - `GET /api/reference/countries`
+  - Response: `ApiResponse<List<CountryOptionDto>>` where each item is `{ code, name }`
+- **Translate an `.srt`**
+  - `POST /api/translation-jobs` (multipart/form-data)
+  - Fields:
+    - `file`: the `.srt` file
+    - `targetLanguage`: target language label (currently the selected **country name** from the combo)
+
+Example requests:
+
+```bash
+curl -s "http://localhost:5000/api/reference/countries" | jq .
+```
+
+```bash
+curl -s -X POST "http://localhost:5000/api/translation-jobs" \
+  -F "file=@./backend/src/main/resources/sample.srt" \
+  -F "targetLanguage=Hungarian"
+```
+
 ## Build with Maven (whole project)
 
 From the repository root, build both modules (backend + UI):
@@ -32,11 +66,10 @@ On Windows PowerShell:
 
 Environment variables used by the backend:
 
-- `OPENAI_API_KEY` (required)
-- `DEEPL_API_KEY` (required)
-- `DEEPL_BASE_URL` (optional, defaults to `https://api-free.deepl.com`)
+- `OPENAI_API_KEY` (required) — used by Spring AI to call the ChatGPT API
+- `PORT` (optional, defaults to `5000`)
 
-The backend starts on `http://localhost:8080` by default.
+The backend starts on `http://localhost:5000` by default.
 
 ## Deploy backend to AWS Elastic Beanstalk
 
@@ -51,8 +84,7 @@ deploys it to Elastic Beanstalk using the Docker platform.
 2. Create an S3 bucket for application versions.
 3. Configure backend environment variables in the EB environment:
    - `OPENAI_API_KEY` (required)
-   - `DEEPL_API_KEY` (required)
-   - `DEEPL_BASE_URL` (optional, defaults to `https://api-free.deepl.com`)
+   - `PORT` (optional; Elastic Beanstalk commonly injects this automatically)
 
 ### GitHub repository secrets
 
@@ -106,11 +138,11 @@ Configure the backend base URL for the UI:
 
 - PowerShell (current session):
   ```powershell
-  $env:VITE_API_BASE_URL="http://localhost:8080"
+  $env:VITE_API_BASE_URL="http://localhost:5000"
   ```
 - Or create `UI/.env.local`:
   ```
-  VITE_API_BASE_URL=http://localhost:8080
+  VITE_API_BASE_URL=http://localhost:5000
   ```
 
 The UI runs at `http://localhost:5173`.
@@ -120,8 +152,8 @@ The UI runs at `http://localhost:5173`.
 1. Start the backend and frontend.
 2. Open `http://localhost:5173` in the browser.
 3. Pick a `.srt` file using the file picker.
-4. Click **Start translation** and watch the status message.
+4. Select a **Target language** from the combo.
+5. Click **Start translation** and watch the status message.
 
-The backend processes the file asynchronously and writes the translated file
-next to the uploaded temp file with a `_hun.srt` suffix (in the system temp
-directory on the backend machine).
+The backend returns the translated `.srt` content to the UI (base64) and the UI offers it as a download.
+On the backend machine, a translated `.srt` file is also written to the backend user’s home directory with a suffix based on the selected target language.

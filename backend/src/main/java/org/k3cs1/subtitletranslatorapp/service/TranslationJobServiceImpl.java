@@ -32,9 +32,6 @@ public class TranslationJobServiceImpl implements TranslationJobService {
     @Value("${translation.max-parallel}")
     private int maxParallel;
 
-    public static final String SRT_EXTENSION = ".srt";
-    public static final String HUN_SRT = "_hun.srt";
-
     @Override
     public CompletableFuture<Path> translateInBackground(TranslationJobRequest request) {
         return CompletableFuture.supplyAsync(() -> {
@@ -43,9 +40,9 @@ public class TranslationJobServiceImpl implements TranslationJobService {
                 Path input = request.inputPath();
                 List<SrtEntry> entries = SrtIOParser.parse(input);
 
-                List<SrtEntry> translated = translateAll(entries);
+                List<SrtEntry> translated = translateAll(entries, request.targetLanguage());
 
-                Path output = outputPath(request.inputPath());
+                Path output = outputPath(request.inputPath(), request.targetLanguage());
                 SrtIOParser.write(output, translated);
                 return output;
             } catch (Exception e) {
@@ -55,7 +52,7 @@ public class TranslationJobServiceImpl implements TranslationJobService {
         }, executor);
     }
 
-    private List<SrtEntry> translateAll(List<SrtEntry> entries) {
+    private List<SrtEntry> translateAll(List<SrtEntry> entries, String targetLanguage) {
 
         // Thread-safe result map
         final Map<Integer, List<String>> translatedTextByIndex = new ConcurrentHashMap<>();
@@ -79,7 +76,7 @@ public class TranslationJobServiceImpl implements TranslationJobService {
                 try {
                     semaphore.acquire();
 
-                    Map<Integer, List<String>> batchResult = translator.translateBatch(batch);
+                    Map<Integer, List<String>> batchResult = translator.translateBatch(batch, targetLanguage);
                     translatedTextByIndex.putAll(batchResult);
 
                     int finished = done.addAndGet(batch.size());
@@ -118,12 +115,21 @@ public class TranslationJobServiceImpl implements TranslationJobService {
         return out;
     }
 
-    private Path outputPath(Path input) {
+    private Path outputPath(Path input, String targetLanguage) {
         Path normalizedInput = input.toAbsolutePath().normalize();
         String name = normalizedInput.getFileName().toString();
         log.debug("Input name: {}", name);
-        String base = name.endsWith(SRT_EXTENSION) ? name.substring(0, name.length() - 4) : name;
-        String outName = base + HUN_SRT;
+        String base = name.toLowerCase().endsWith(".srt") ? name.substring(0, name.length() - 4) : name;
+        String suffix = targetLanguage == null ? "" : targetLanguage.toLowerCase();
+        suffix = suffix.replaceAll("[^a-z0-9]+", "-");
+        suffix = suffix.replaceAll("(^-+|-+$)", "");
+        if (suffix.isBlank()) {
+            suffix = "translated";
+        }
+        if (suffix.length() > 24) {
+            suffix = suffix.substring(0, 24);
+        }
+        String outName = base + "_" + suffix + ".srt";
         Path userHome = Path.of(System.getProperty("user.home"));
         return userHome.resolve(outName);
     }

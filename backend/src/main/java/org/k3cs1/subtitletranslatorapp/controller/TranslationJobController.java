@@ -31,12 +31,16 @@ public class TranslationJobController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<?>> createTranslationJob(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("targetLanguage") String targetLanguage) {
         Path tempFile = null;
         Path output = null;
         try {
             if (file == null || file.isEmpty()) {
                 throw new InvalidArgumentException("Subtitle file is required.");
+            }
+            if (targetLanguage == null || targetLanguage.isBlank()) {
+                throw new InvalidArgumentException("Target language is required.");
             }
 
             String originalName = file.getOriginalFilename();
@@ -50,11 +54,11 @@ public class TranslationJobController {
             // Content-based validation (reject renamed non-SRT files)
             SrtIOParser.validateSrtContent(tempFile);
 
-            TranslationJobRequest request = new TranslationJobRequest(tempFile);
+            TranslationJobRequest request = new TranslationJobRequest(tempFile, targetLanguage);
             output = translationJobService.translateInBackground(request).join();
             byte[] translatedBytes = Files.readAllBytes(output);
             String contentBase64 = Base64.getEncoder().encodeToString(translatedBytes);
-            String outputFileName = outputFileNameForOriginal(originalName);
+            String outputFileName = outputFileNameForOriginal(originalName, targetLanguage);
 
             TranslationJobResponse response = new TranslationJobResponse(originalName, outputFileName, contentBase64);
             ApiResponse<?> apiResponse = ApiResponse.success("Translation completed.", response);
@@ -79,10 +83,19 @@ public class TranslationJobController {
         }
     }
 
-    private String outputFileNameForOriginal(String originalName) {
+    private String outputFileNameForOriginal(String originalName, String targetLanguage) {
         String lower = originalName.toLowerCase();
         String base = lower.endsWith(".srt") ? originalName.substring(0, originalName.length() - 4) : originalName;
-        return base + "_hun.srt";
+        String suffix = targetLanguage == null ? "" : targetLanguage.toLowerCase();
+        suffix = suffix.replaceAll("[^a-z0-9]+", "-");
+        suffix = suffix.replaceAll("(^-+|-+$)", "");
+        if (suffix.isBlank()) {
+            suffix = "translated";
+        }
+        if (suffix.length() > 24) {
+            suffix = suffix.substring(0, 24);
+        }
+        return base + "_" + suffix + ".srt";
     }
 
 }
