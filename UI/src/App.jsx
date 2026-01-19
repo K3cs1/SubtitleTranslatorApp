@@ -41,7 +41,11 @@ function App() {
           setCountryOptions(options)
           setCountriesStatus('ready')
           if (!targetLanguage && options.length > 0) {
-            setTargetLanguage(options[0].code)
+            const defaultOption =
+              options.find((option) => option.name?.toLowerCase() === 'hungary') ||
+              options.find((option) => option.code?.toUpperCase() === 'HU') ||
+              options[0]
+            setTargetLanguage(defaultOption?.code || '')
           }
         }
       } catch (error) {
