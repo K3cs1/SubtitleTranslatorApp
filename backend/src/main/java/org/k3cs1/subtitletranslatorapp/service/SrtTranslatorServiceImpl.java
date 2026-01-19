@@ -47,13 +47,13 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
         try (InputStream in = systemMessageResource.getInputStream()) {
             system = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
-        system = Objects.requireNonNull(system, "System prompt is null");
-        system = system.replace("{{TARGET_LANGUAGE}}", targetLanguage.trim());
+        String systemPrompt = Objects.requireNonNull(system, "System prompt is null")
+                .replace("{{TARGET_LANGUAGE}}", targetLanguage.trim());
 
         String user = "Translate this SRT text payload:\n\n" + payload;
 
         String response = Objects.requireNonNull(chatClient.prompt()
-                .system(system)
+                .system(Objects.requireNonNull(systemPrompt, "System prompt is null"))
                 .user(user)
                 .call()
                 .content(), "Chat response content is null");
