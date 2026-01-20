@@ -8,6 +8,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.io.UncheckedIOException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,12 +25,15 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
     private final ChatClient.Builder builder;
     private ChatClient chatClient;
 
+    private String systemPromptTemplate;
+
     @Value("classpath:system_message_prompt.md")
     private Resource systemMessageResource;
 
     @PostConstruct
     public void init() {
         this.chatClient = builder.build();
+        this.systemPromptTemplate = readSystemPromptTemplate();
     }
 
     @Override
@@ -38,16 +41,8 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
         if (targetLanguage == null || targetLanguage.isBlank()) {
             throw new IllegalArgumentException("Target language is required.");
         }
-        String payload = batch.stream()
-                .map(e -> "<<<ENTRY " + e.index() + ">>>\n" + e.originalText() + "\n<<<END>>>")
-                .collect(Collectors.joining("\n"));
-
-        // Resource#getFile() breaks when running from a packaged jar. Always read via stream.
-        String system;
-        try (InputStream in = systemMessageResource.getInputStream()) {
-            system = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
-        String systemPrompt = Objects.requireNonNull(system, "System prompt is null")
+        String payload = buildPayload(batch);
+        String systemPrompt = Objects.requireNonNull(systemPromptTemplate, "System prompt template is not initialized")
                 .replace("{{TARGET_LANGUAGE}}", targetLanguage.trim());
 
         String user = "Translate this SRT text payload:\n\n" + payload;
@@ -59,6 +54,33 @@ public class SrtTranslatorServiceImpl implements SrtTranslatorService {
                 .content(), "Chat response content is null");
 
         return parseTranslatedPayload(response);
+    }
+
+    private String readSystemPromptTemplate() {
+        try (InputStream in = systemMessageResource.getInputStream()) {
+            String template = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            return Objects.requireNonNull(template, "System prompt template is null");
+        } catch (IOException ioe) {
+            throw new UncheckedIOException("Failed to read system prompt template", ioe);
+        }
+    }
+
+    private static String buildPayload(List<SrtEntry> batch) {
+        if (batch == null || batch.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(batch.size() * 128);
+        boolean first = true;
+        for (SrtEntry e : batch) {
+            if (!first) {
+                sb.append('\n');
+            }
+            first = false;
+            sb.append("<<<ENTRY ").append(e.index()).append(">>>\n")
+                    .append(e.originalText())
+                    .append("\n<<<END>>>");
+        }
+        return sb.toString();
     }
 
     private Map<Integer, List<String>> parseTranslatedPayload(String response) {

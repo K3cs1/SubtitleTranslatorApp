@@ -28,6 +28,13 @@ public class TranslationJobServiceImpl implements TranslationJobService {
     @Value("${translation.batch-size}")
     private int batchSize;
 
+    /**
+     * Safety cap to avoid creating oversized prompts for the LLM.
+     * This is an approximate character budget of the user payload (markers + entry text).
+     */
+    @Value("${translation.max-batch-chars:12000}")
+    private int maxBatchChars;
+
     // Max parallel in-flight translation calls
     @Value("${translation.max-parallel}")
     private int maxParallel;
@@ -63,18 +70,17 @@ public class TranslationJobServiceImpl implements TranslationJobService {
         // Concurrency limiter (even with virtual threads)
         final var semaphore = new Semaphore(this.maxParallel);
 
-        // Build batch list first to avoid subList surprises and to count batches
-        final List<List<SrtEntry>> batches = new ArrayList<>();
-        for (int i = 0; i < entries.size(); i += this.batchSize) {
-            batches.add(entries.subList(i, Math.min(i + this.batchSize, entries.size())));
-        }
+        // Build batches using an entry-count limit + a payload-size safety cap
+        final List<List<SrtEntry>> batches = buildBatches(entries, this.batchSize, this.maxBatchChars);
 
         List<CompletableFuture<Void>> futures = new ArrayList<>(batches.size());
 
         for (List<SrtEntry> batch : batches) {
             futures.add(CompletableFuture.runAsync(() -> {
+                boolean acquired = false;
                 try {
                     semaphore.acquire();
+                    acquired = true;
 
                     Map<Integer, List<String>> batchResult = translator.translateBatch(batch, targetLanguage);
                     translatedTextByIndex.putAll(batchResult);
@@ -90,7 +96,9 @@ public class TranslationJobServiceImpl implements TranslationJobService {
                     log.error(ioe.getMessage());
                     throw new TranslationFailedException(ioe.getMessage());
                 } finally {
-                    semaphore.release();
+                    if (acquired) {
+                        semaphore.release();
+                    }
                 }
             }, executor));
         }
@@ -113,6 +121,41 @@ public class TranslationJobServiceImpl implements TranslationJobService {
             out.add(new SrtEntry(e.index(), e.timeRange(), lines));
         }
         return out;
+    }
+
+    private static List<List<SrtEntry>> buildBatches(List<SrtEntry> entries, int batchSize, int maxBatchChars) {
+        if (entries == null || entries.isEmpty()) {
+            return List.of();
+        }
+        int safeBatchSize = Math.max(1, batchSize);
+        int safeMaxChars = Math.max(512, maxBatchChars);
+
+        final List<List<SrtEntry>> batches = new ArrayList<>();
+        List<SrtEntry> current = new ArrayList<>(Math.min(safeBatchSize, entries.size()));
+        int currentChars = 0;
+
+        for (SrtEntry e : entries) {
+            // Approximate per-entry payload length: markers + entry text + newlines
+            int entryChars = 40 + (e == null ? 0 : e.originalText().length());
+
+            boolean wouldExceedCount = current.size() >= safeBatchSize;
+            boolean wouldExceedChars = !current.isEmpty() && (currentChars + 1 + entryChars) > safeMaxChars;
+
+            if (wouldExceedCount || wouldExceedChars) {
+                batches.add(current);
+                current = new ArrayList<>(Math.min(safeBatchSize, entries.size()));
+                currentChars = 0;
+            }
+
+            current.add(e);
+            currentChars += entryChars + 1;
+        }
+
+        if (!current.isEmpty()) {
+            batches.add(current);
+        }
+
+        return batches;
     }
 
     private Path outputPath(Path input, String targetLanguage) {

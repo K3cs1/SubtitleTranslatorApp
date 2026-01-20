@@ -23,7 +23,10 @@ deepl:
   base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
   auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
 translation:
-  batch-size: 30
+  # Upper bound on number of entries per OpenAI request (actual batch may be smaller due to max-batch-chars).
+  batch-size: 60
+  # Safety cap to avoid oversized prompts; tune up/down based on your subtitles/model limits.
+  max-batch-chars: 12000
   max-parallel: 5
 logging:
   level:
