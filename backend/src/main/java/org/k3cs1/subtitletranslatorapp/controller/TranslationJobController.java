@@ -63,28 +63,41 @@ public class TranslationJobController {
             // Content-based validation (reject renamed non-SRT files)
             SrtIOParser.validateSrtContent(tempFile);
 
+            // Parse file to get total entries count for progress tracking
+            int totalEntries = SrtIOParser.parse(tempFile).size();
+
             // Generate job ID
             String jobId = UUID.randomUUID().toString();
             final Path finalTempFile = tempFile; // Capture for lambda
 
-            // Store initial status
-            jobStore.store(jobId, TranslationJobStatusResponse.pending(jobId, originalName));
+            // Store initial status with total entries count
+            jobStore.store(jobId, TranslationJobStatusResponse.pending(jobId, originalName, totalEntries));
 
             // Start translation asynchronously
-            TranslationJobRequest request = new TranslationJobRequest(finalTempFile, targetLanguage);
+            TranslationJobRequest request = new TranslationJobRequest(finalTempFile, targetLanguage, jobId);
             translationJobService.translateInBackground(request)
                     .thenAccept(output -> {
                         try {
+                            // Get current status to preserve progress information
+                            TranslationJobStatusResponse currentStatus = jobStore.get(jobId);
+                            Integer totalEntriesForCompletion = currentStatus != null ? currentStatus.totalEntries() : null;
+                            
                             // Update status to processing (already processing, but update for consistency)
-                            jobStore.store(jobId, TranslationJobStatusResponse.processing(jobId, originalName));
+                            // Preserve progress if available
+                            if (currentStatus != null && currentStatus.translatedEntries() != null && currentStatus.totalEntries() != null) {
+                                jobStore.store(jobId, TranslationJobStatusResponse.processing(
+                                        jobId, originalName, currentStatus.translatedEntries(), currentStatus.totalEntries()));
+                            } else {
+                                jobStore.store(jobId, TranslationJobStatusResponse.processing(jobId, originalName));
+                            }
 
                             byte[] translatedBytes = Files.readAllBytes(output);
                             String contentBase64 = Base64.getEncoder().encodeToString(translatedBytes);
                             String outputFileName = outputFileNameForOriginal(originalName, targetLanguage);
 
-                            // Store completed status
+                            // Store completed status with total entries for consistency
                             jobStore.store(jobId, TranslationJobStatusResponse.completed(
-                                    jobId, originalName, outputFileName, contentBase64));
+                                    jobId, originalName, outputFileName, contentBase64, totalEntriesForCompletion));
 
                             // Cleanup files
                             Files.deleteIfExists(output);

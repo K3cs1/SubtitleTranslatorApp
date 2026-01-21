@@ -35,6 +35,9 @@ class TranslationJobServiceImplTest {
     @Mock
     private SrtTranslatorService translator;
 
+    @Mock
+    private TranslationJobStore jobStore;
+
     private ExecutorService executor;
     private TranslationJobServiceImpl service;
 
@@ -42,7 +45,7 @@ class TranslationJobServiceImplTest {
     @SuppressWarnings({"NullAway", "nullness"})
     void setUp() {
         executor = Executors.newFixedThreadPool(4);
-        service = new TranslationJobServiceImpl(translator, executor);
+        service = new TranslationJobServiceImpl(translator, executor, jobStore);
         TranslationJobServiceImpl target = Objects.requireNonNull(service);
         ReflectionTestUtils.setField(target, "batchSize", 1);
         ReflectionTestUtils.setField(target, "maxParallel", 2);

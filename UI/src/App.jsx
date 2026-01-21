@@ -13,6 +13,8 @@ function App() {
   const [targetLanguage, setTargetLanguage] = useState('')
   const [jobId, setJobId] = useState(null)
   const [jobStatus, setJobStatus] = useState(null)
+  const [translatedEntries, setTranslatedEntries] = useState(null)
+  const [totalEntries, setTotalEntries] = useState(null)
   const pollingIntervalRef = useRef(null)
   const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
@@ -100,6 +102,14 @@ function App() {
       if (jobStatusData) {
         setJobStatus(jobStatusData.status)
         
+        // Update progress information
+        if (jobStatusData.translatedEntries !== null && jobStatusData.translatedEntries !== undefined) {
+          setTranslatedEntries(jobStatusData.translatedEntries)
+        }
+        if (jobStatusData.totalEntries !== null && jobStatusData.totalEntries !== undefined) {
+          setTotalEntries(jobStatusData.totalEntries)
+        }
+        
         if (jobStatusData.status === 'COMPLETED') {
           stopPolling()
           setIsSubmitting(false)
@@ -135,6 +145,8 @@ function App() {
     setStatusMessage('')
     setJobId(null)
     setJobStatus(null)
+    setTranslatedEntries(null)
+    setTotalEntries(null)
     stopPolling()
     if (downloadUrl) {
       URL.revokeObjectURL(downloadUrl)
@@ -174,6 +186,8 @@ function App() {
     setStatusMessage('Starting translation...')
     setJobId(null)
     setJobStatus(null)
+    setTranslatedEntries(null)
+    setTotalEntries(null)
     stopPolling()
     if (downloadUrl) {
       URL.revokeObjectURL(downloadUrl)
@@ -295,6 +309,19 @@ function App() {
           </span>
         </div>
         {statusMessage ? <p className="status-message">{statusMessage}</p> : null}
+        {jobStatus === 'PROCESSING' && translatedEntries !== null && totalEntries !== null && totalEntries > 0 ? (
+          <div className="progress-container">
+            <div className="progress-bar-wrapper">
+              <div 
+                className="progress-bar-fill" 
+                style={{ width: `${Math.min(100, Math.max(0, (translatedEntries / totalEntries) * 100))}%` }}
+              />
+            </div>
+            <div className="progress-text">
+              {translatedEntries} / {totalEntries} entries ({Math.round((translatedEntries / totalEntries) * 100)}%)
+            </div>
+          </div>
+        ) : null}
         {downloadUrl ? (
           <div className="download-row">
             <a className="secondary-button" href={downloadUrl} download={downloadName}>

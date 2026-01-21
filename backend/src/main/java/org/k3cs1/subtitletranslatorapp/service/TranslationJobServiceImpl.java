@@ -3,6 +3,7 @@ package org.k3cs1.subtitletranslatorapp.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobRequest;
+import org.k3cs1.subtitletranslatorapp.dto.TranslationJobStatusResponse;
 import org.k3cs1.subtitletranslatorapp.exception.TranslationFailedException;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
@@ -24,6 +25,7 @@ public class TranslationJobServiceImpl implements TranslationJobService {
 
     private final SrtTranslatorService translator;
     private final ExecutorService executor;
+    private final TranslationJobStore jobStore;
 
     @Value("${translation.batch-size}")
     private int batchSize;
@@ -47,7 +49,7 @@ public class TranslationJobServiceImpl implements TranslationJobService {
                 Path input = request.inputPath();
                 List<SrtEntry> entries = SrtIOParser.parse(input);
 
-                List<SrtEntry> translated = translateAll(entries, request.targetLanguage());
+                List<SrtEntry> translated = translateAll(entries, request.targetLanguage(), request.jobId());
 
                 Path output = outputPath(request.inputPath(), request.targetLanguage());
                 SrtIOParser.write(output, translated);
@@ -59,13 +61,14 @@ public class TranslationJobServiceImpl implements TranslationJobService {
         }, executor);
     }
 
-    private List<SrtEntry> translateAll(List<SrtEntry> entries, String targetLanguage) {
+    private List<SrtEntry> translateAll(List<SrtEntry> entries, String targetLanguage, String jobId) {
 
         // Thread-safe result map
         final Map<Integer, List<String>> translatedTextByIndex = new ConcurrentHashMap<>();
 
         // For progress reporting
         final var done = new AtomicInteger(0);
+        final int totalEntries = entries.size();
 
         // Concurrency limiter (even with virtual threads)
         final var semaphore = new Semaphore(this.maxParallel);
@@ -87,6 +90,16 @@ public class TranslationJobServiceImpl implements TranslationJobService {
 
                     int finished = done.addAndGet(batch.size());
                     log.info("Translated {}/{} entries", finished, entries.size());
+
+                    // Update progress in job store if jobId is provided
+                    if (jobId != null && !jobId.isBlank() && jobStore != null) {
+                        TranslationJobStatusResponse currentStatus = jobStore.get(jobId);
+                        if (currentStatus != null) {
+                            String inputFileName = currentStatus.inputFileName();
+                            jobStore.store(jobId, TranslationJobStatusResponse.processing(
+                                    jobId, inputFileName, finished, totalEntries));
+                        }
+                    }
 
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
