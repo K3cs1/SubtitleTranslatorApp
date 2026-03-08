@@ -4,7 +4,7 @@ spring:
       api-key: ${OPENAI_API_KEY:OPENAI_API_KEY}
       chat:
         options:
-          model: gpt-5.2
+          model: gpt-4o-mini
           temperature: 0.0
   servlet:
     multipart:
