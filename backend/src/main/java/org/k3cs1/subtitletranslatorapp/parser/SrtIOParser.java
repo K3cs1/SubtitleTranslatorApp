@@ -3,8 +3,11 @@ package org.k3cs1.subtitletranslatorapp.parser;
 import org.k3cs1.subtitletranslatorapp.exception.InvalidArgumentException;
 import org.k3cs1.subtitletranslatorapp.model.SrtEntry;
 
-import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,48 +34,42 @@ public final class SrtIOParser {
 
         int linesScanned = 0;
         int maxLinesToScan = 300;
+        List<String> allLines = readSubtitleLines(path);
 
-        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            String line;
+        for (int lineIdx = 0; lineIdx < allLines.size() && linesScanned < maxLinesToScan; ) {
+            String line = allLines.get(lineIdx++);
+            linesScanned++;
+            String trimmed = line.replace("\uFEFF", "").trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
 
-            // Find the first non-empty line (index line), then the next non-empty line must be a time range.
-            while ((line = reader.readLine()) != null && linesScanned < maxLinesToScan) {
+            String idx = trimmed.replaceAll("[^0-9]", "");
+            if (idx.isEmpty()) {
+                throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file (missing numeric index line).");
+            }
+
+            while (lineIdx < allLines.size() && linesScanned < maxLinesToScan) {
+                String timeLine = allLines.get(lineIdx++);
                 linesScanned++;
-                String trimmed = line.replace("\uFEFF", "").trim();
-                if (trimmed.isEmpty()) {
+                String t = timeLine.trim();
+                if (t.isEmpty()) {
                     continue;
                 }
-
-                // index line must be digits (some files include whitespace; allow that)
-                String idx = trimmed.replaceAll("[^0-9]", "");
-                if (idx.isEmpty()) {
-                    throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file (missing numeric index line).");
+                if (!SRT_TIME_RANGE.matcher(t).matches()) {
+                    throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file (invalid time range line).");
                 }
-
-                // now find the next non-empty line and validate time range format
-                String timeLine;
-                while ((timeLine = reader.readLine()) != null && linesScanned < maxLinesToScan) {
-                    linesScanned++;
-                    String t = timeLine.trim();
-                    if (t.isEmpty()) {
-                        continue;
-                    }
-                    if (!SRT_TIME_RANGE.matcher(t).matches()) {
-                        throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file (invalid time range line).");
-                    }
-                    return; // looks like SRT
-                }
-
-                // file ended before a time range line appeared
-                throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file (incomplete header).");
+                return;
             }
+
+            throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file (incomplete header).");
         }
 
         throw new InvalidArgumentException("Uploaded file is not a valid .srt subtitle file.");
     }
 
     public static List<SrtEntry> parse(Path path) throws IOException {
-        List<String> all = Files.readAllLines(path, StandardCharsets.UTF_8);
+        List<String> all = readSubtitleLines(path);
         List<SrtEntry> entries = new ArrayList<>();
 
         int i = 0;
@@ -133,6 +130,24 @@ public final class SrtIOParser {
             lines.add(""); // blank line
         }
         Files.write(out, lines, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Many .srt files are not UTF-8 (e.g. Windows-1252 / Latin-1). Strict UTF-8 decoding throws
+     * {@link CharacterCodingException}, which surfaces to clients as a generic read failure.
+     */
+    private static List<String> readSubtitleLines(Path path) throws IOException {
+        byte[] raw = Files.readAllBytes(path);
+        String text;
+        try {
+            CharsetDecoder utf8 = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT);
+            text = utf8.decode(ByteBuffer.wrap(raw)).toString();
+        } catch (CharacterCodingException ex) {
+            text = StandardCharsets.ISO_8859_1.decode(ByteBuffer.wrap(raw)).toString();
+        }
+        return text.lines().toList();
     }
 
     private SrtIOParser() {
