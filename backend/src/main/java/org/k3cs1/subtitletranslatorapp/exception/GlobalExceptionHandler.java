@@ -6,8 +6,11 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,6 +35,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
         return errorResponseEntity("Uploaded file is too large.", HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<?>> handleMultipartException(MultipartException ex) {
+        return errorResponseEntity(
+                "Invalid multipart upload. Ensure the file field is named \"file\" and the request is multipart/form-data.",
+                HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<?>> handleMissingServletRequestPartException(MissingServletRequestPartException ex) {
+        return errorResponseEntity(
+                "Required part \"" + ex.getRequestPartName() + "\" is missing.",
+                HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<?>> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException ex) {
+        return errorResponseEntity(
+                "Required parameter \"" + ex.getParameterName() + "\" is missing.",
+                HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(TranslationFailedException.class)

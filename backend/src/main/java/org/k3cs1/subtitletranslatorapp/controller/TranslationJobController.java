@@ -1,6 +1,7 @@
 package org.k3cs1.subtitletranslatorapp.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.k3cs1.subtitletranslatorapp.api.ApiResponse;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobCreateResponse;
 import org.k3cs1.subtitletranslatorapp.dto.TranslationJobRequest;
@@ -19,14 +20,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.RejectedExecutionException;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/translation-jobs")
 @RequiredArgsConstructor
@@ -58,7 +64,7 @@ public class TranslationJobController {
             }
 
             tempFile = Files.createTempFile("subtitle-", ".srt");
-            file.transferTo(Objects.requireNonNull(tempFile.toFile(), "Temp file must not be null"));
+            file.transferTo(Objects.requireNonNull(tempFile, "Temp file path must not be null"));
 
             // Content-based validation (reject renamed non-SRT files)
             SrtIOParser.validateSrtContent(tempFile);
@@ -136,6 +142,62 @@ public class TranslationJobController {
                 }
             }
             return GlobalExceptionHandler.errorResponseEntity(ex.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException ex) {
+            // MultipartFile.transferTo and similar can throw this if the part was already read or is invalid.
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ignored) {
+                }
+            }
+            log.warn("Invalid multipart state while accepting upload: {}", ex.toString());
+            String msg = ex.getMessage();
+            if (msg == null || msg.isBlank()) {
+                msg = "Invalid upload. Try selecting the file again.";
+            }
+            return GlobalExceptionHandler.errorResponseEntity(msg, HttpStatus.BAD_REQUEST);
+        } catch (IOException ex) {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ignored) {
+                }
+            }
+            log.error("Failed to read or store uploaded subtitle file", ex);
+            return GlobalExceptionHandler.errorResponseEntity(
+                    "Could not read the uploaded file. Try again or use a different .srt file.",
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (UncheckedIOException ex) {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ignored) {
+                }
+            }
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            log.error("Failed to read or store uploaded subtitle file (unchecked I/O)", cause);
+            return GlobalExceptionHandler.errorResponseEntity(
+                    "Could not read the uploaded file. Try again or use a different .srt file.",
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (RejectedExecutionException ex) {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ignored) {
+                }
+            }
+            log.error("Translation executor rejected job submission", ex);
+            return GlobalExceptionHandler.errorResponseEntity(
+                    "Server is busy. Please try again shortly.",
+                    HttpStatus.SERVICE_UNAVAILABLE);
+        } catch (MultipartException ex) {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (Exception ignored) {
+                }
+            }
+            throw ex;
         } catch (Exception ex) {
             if (tempFile != null) {
                 try {
@@ -143,6 +205,11 @@ public class TranslationJobController {
                 } catch (Exception ignored) {
                 }
             }
+            MultipartException multipartInChain = findMultipartExceptionInCauseChain(ex);
+            if (multipartInChain != null) {
+                throw multipartInChain;
+            }
+            log.error("Failed to start translation job: {} — {}", ex.getClass().getName(), ex.getMessage(), ex);
             return GlobalExceptionHandler.errorResponseEntity("Failed to start translation.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -160,6 +227,25 @@ public class TranslationJobController {
         } catch (Exception ex) {
             return GlobalExceptionHandler.errorResponseEntity("Failed to retrieve job status.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Spring sometimes wraps multipart failures (e.g. size limit) in a servlet exception; unwrap so
+     * {@link GlobalExceptionHandler} can return the right message instead of a generic 500.
+     */
+    private static MultipartException findMultipartExceptionInCauseChain(Throwable ex) {
+        Throwable t = ex;
+        for (int depth = 0; t != null && depth < 12; depth++) {
+            if (t instanceof MultipartException me) {
+                return me;
+            }
+            Throwable cause = t.getCause();
+            if (cause == null || cause == t) {
+                break;
+            }
+            t = cause;
+        }
+        return null;
     }
 
     private String outputFileNameForOriginal(String originalName, String targetLanguage) {

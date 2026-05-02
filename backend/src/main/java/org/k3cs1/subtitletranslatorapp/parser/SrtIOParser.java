@@ -94,14 +94,23 @@ public final class SrtIOParser {
             idxLine = idxLine.replaceAll("[^0-9]", "");
 
             if (idxLine.isEmpty()) {
-                throw new IllegalArgumentException("Invalid SRT index line at input line " + (i + 1) + ": '" + all.get(i) + "'");
+                throw new InvalidArgumentException("Invalid SRT index line at input line " + (i + 1) + ": '" + all.get(i) + "'");
             }
 
             int index = Integer.parseInt(idxLine);
 
             i++;
 
-            String timeRange = all.get(i);
+            if (i >= all.size()) {
+                throw new InvalidArgumentException(
+                        "Invalid SRT file: missing time range line after cue " + index + ".");
+            }
+
+            String timeRange = all.get(i).replace("\uFEFF", "").trim();
+            if (!SRT_TIME_RANGE.matcher(timeRange).matches()) {
+                throw new InvalidArgumentException(
+                        "Invalid SRT file: bad time range after cue " + index + ".");
+            }
             i++;
 
             List<String> lines = new ArrayList<>();
