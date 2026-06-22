@@ -34,6 +34,14 @@ curl -s -X POST "http://localhost:5000/api/translation-jobs" \
   -F "targetLanguage=Hungarian"
 ```
 
+## Prerequisites
+
+- **JDK 25** — the project targets Java 25. Ensure `JAVA_HOME` points to your JDK 25 installation before running Maven from the command line:
+  ```powershell
+  $env:JAVA_HOME = "C:\Java\jdk-25"   # adjust path to your JDK 25 install
+  ```
+  > IntelliJ IDEA users: configure the Maven JDK in **Settings → Build → Build Tools → Maven → JDK for importer** (and the project SDK) to JDK 25.
+
 ## Build with Maven (whole project)
 
 From the repository root, build both modules (backend + UI):
@@ -48,7 +56,7 @@ On Windows PowerShell:
 .\mvnw.cmd clean package
 ```
 
-This runs the Spring Boot build and the UI build via the `frontend-maven-plugin`.
+This runs the Spring Boot 4.1.0 build and the UI build via the `frontend-maven-plugin`.
 
 ## Start the backend locally
 

@@ -3,9 +3,8 @@ spring:
     openai:
       api-key: ${OPENAI_API_KEY:OPENAI_API_KEY}
       chat:
-        options:
-          model: gpt-4o-mini
-          temperature: 0.0
+        model: gpt-4o-mini
+        temperature: 0.0
   servlet:
     multipart:
       max-file-size: 2MB
