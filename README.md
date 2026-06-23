@@ -165,3 +165,67 @@ The UI runs at `http://localhost:5173`.
 
 The backend returns the translated `.srt` content to the UI (base64) and the UI offers it as a download.
 On the backend machine, a translated `.srt` file is also written to the backend user’s home directory with a suffix based on the selected target language.
+
+## GitHub Spec Kit
+
+This repository uses [GitHub Spec Kit](https://github.com/github/spec-kit) (v0.11.3) for
+[Spec-Driven Development](https://github.github.io/spec-kit/concepts/sdd.html). Features are
+defined as version-controlled Markdown artifacts (spec → plan → tasks → implement) that guide
+AI-assisted development in Cursor via Claude skills.
+
+### Project layout
+
+```text
+.
+├── .specify/
+│   ├── memory/constitution.md   # Project governing principles
+│   ├── templates/               # Spec, plan, and task templates
+│   └── scripts/                 # Feature scaffolding helpers
+├── .claude/skills/speckit-*/    # Cursor slash-command skills
+└── specs/
+    └── 001-springboot4-upgrade/ # Feature artifacts (spec, plan, tasks, …)
+```
+
+### Slash commands (Cursor / Claude)
+
+| Command | Purpose |
+| --- | --- |
+| `/speckit-constitution` | Create or update project principles |
+| `/speckit-specify` | Define requirements for a new feature |
+| `/speckit-clarify` | Resolve ambiguities before planning |
+| `/speckit-checklist` | Validate requirement quality |
+| `/speckit-plan` | Create a technical implementation plan |
+| `/speckit-tasks` | Generate an actionable task list |
+| `/speckit-analyze` | Cross-check spec, plan, and tasks before implementation |
+| `/speckit-implement` | Execute tasks from `tasks.md` |
+| `/speckit-converge` | Append remaining work after a partial implement |
+| `/speckit-taskstoissues` | Convert tasks to GitHub issues |
+
+### Recommended workflow
+
+For production features:
+
+```text
+/speckit-specify → /speckit-clarify → /speckit-checklist → /speckit-plan → /speckit-tasks → /speckit-analyze → /speckit-implement
+```
+
+For quick experiments:
+
+```text
+/speckit-specify → /speckit-plan → /speckit-tasks → /speckit-implement
+```
+
+Spec Kit tracks the active feature from the current Git branch (for example,
+`001-springboot4-upgrade`). Switch branches to work on a different feature.
+
+### Key artifacts
+
+- **Constitution**: [.specify/memory/constitution.md](.specify/memory/constitution.md) — layered architecture, DTO rules, OWASP, and deployment constraints
+- **Current feature**: [specs/001-springboot4-upgrade/](specs/001-springboot4-upgrade/) — Spring Boot 4.1.0 upgrade spec, plan, and tasks
+- **Agent context**: [CLAUDE.md](CLAUDE.md) — managed plan pointer for coding agents (refreshed after `/speckit-specify` and `/speckit-plan`)
+
+### Starting a new feature
+
+1. Run `/speckit-specify` with a plain-language description of what to build (this creates `specs/NNN-feature-name/`).
+2. Follow the workflow above through implementation.
+3. See the [Spec Kit quick start](https://github.github.io/spec-kit/quickstart.html) for full documentation.
