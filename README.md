@@ -74,7 +74,8 @@ On Windows PowerShell:
 
 Environment variables used by the backend:
 
-- `OPENAI_API_KEY` (required) — used by Spring AI to call the ChatGPT API
+- `DEEPL_API_KEY` (required) — DeepL API authentication key
+- `DEEPL_BASE_URL` (optional, defaults to `https://api-free.deepl.com`; use `https://api.deepl.com` for Pro)
 - `PORT` (optional, defaults to `5000`)
 
 The backend starts on `http://localhost:5000` by default.
@@ -91,7 +92,8 @@ deploys it to Elastic Beanstalk using the Docker platform.
    - Instance profile should allow EB to read from the S3 bucket used for deployments.
 2. Create an S3 bucket for application versions.
 3. Configure backend environment variables in the EB environment:
-   - `OPENAI_API_KEY` (required)
+   - `DEEPL_API_KEY` (required)
+   - `DEEPL_BASE_URL` (optional; Free vs Pro endpoint)
    - `PORT` (optional; Elastic Beanstalk commonly injects this automatically)
 
 ### GitHub repository secrets

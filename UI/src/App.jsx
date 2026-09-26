@@ -7,9 +7,9 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState('')
   const [downloadName, setDownloadName] = useState('')
-  const [countryOptions, setCountryOptions] = useState([])
-  const [countriesStatus, setCountriesStatus] = useState('loading')
-  const [countriesError, setCountriesError] = useState('')
+  const [languageOptions, setLanguageOptions] = useState([])
+  const [languagesStatus, setLanguagesStatus] = useState('loading')
+  const [languagesError, setLanguagesError] = useState('')
   const [targetLanguage, setTargetLanguage] = useState('')
   const [jobId, setJobId] = useState(null)
   const [jobStatus, setJobStatus] = useState(null)
@@ -21,51 +21,53 @@ function App() {
   useEffect(() => {
     let isCancelled = false
 
-    const loadCountries = async () => {
+    const loadTargetLanguages = async () => {
       if (!apiBaseUrl) {
-        setCountriesStatus('error')
-        setCountriesError('VITE_API_BASE_URL is not configured.')
+        setLanguagesStatus('error')
+        setLanguagesError('VITE_API_BASE_URL is not configured. Create UI/.env.local with VITE_API_BASE_URL=http://localhost:5000')
         return
       }
 
-      setCountriesStatus('loading')
-      setCountriesError('')
+      setLanguagesStatus('loading')
+      setLanguagesError('')
       try {
         const response = await fetch(`${apiBaseUrl}/api/reference/countries`, { method: 'GET' })
         const payload = await response.json().catch(() => null)
         if (!response.ok) {
-          const errorMessage = payload?.message || 'Failed to load countries.'
+          const errorMessage = payload?.message || `Failed to load target languages (${response.status}).`
           throw new Error(errorMessage)
         }
 
         const options = Array.isArray(payload?.data) ? payload.data : []
         if (!isCancelled) {
-          setCountryOptions(options)
-          setCountriesStatus('ready')
+          setLanguageOptions(options)
+          setLanguagesStatus('ready')
           if (!targetLanguage && options.length > 0) {
             const defaultOption =
-              options.find((option) => option.name?.toLowerCase() === 'hungary') ||
               options.find((option) => option.code?.toUpperCase() === 'HU') ||
+              options.find((option) => option.name?.toLowerCase().includes('hungarian')) ||
               options[0]
             setTargetLanguage(defaultOption?.code || '')
           }
         }
       } catch (error) {
         if (!isCancelled) {
-          setCountriesStatus('error')
-          setCountriesError(error.message || 'Failed to load countries.')
+          setLanguagesStatus('error')
+          setLanguagesError(
+            error.message ||
+              'Failed to load target languages. Is the backend running on the configured VITE_API_BASE_URL?'
+          )
         }
       }
     }
 
-    loadCountries()
+    loadTargetLanguages()
     return () => {
       isCancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBaseUrl])
 
-  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {
@@ -101,19 +103,18 @@ function App() {
       const jobStatusData = payload?.data
       if (jobStatusData) {
         setJobStatus(jobStatusData.status)
-        
-        // Update progress information
+
         if (jobStatusData.translatedEntries !== null && jobStatusData.translatedEntries !== undefined) {
           setTranslatedEntries(jobStatusData.translatedEntries)
         }
         if (jobStatusData.totalEntries !== null && jobStatusData.totalEntries !== undefined) {
           setTotalEntries(jobStatusData.totalEntries)
         }
-        
+
         if (jobStatusData.status === 'COMPLETED') {
           stopPolling()
           setIsSubmitting(false)
-          
+
           if (jobStatusData.contentBase64) {
             const blobUrl = createBlobUrlFromBase64(jobStatusData.contentBase64, 'application/x-subrip')
             setDownloadUrl(blobUrl)
@@ -167,20 +168,17 @@ function App() {
   }
 
   const handleStartTranslation = async () => {
-    const selectedTarget = countryOptions.find((option) => option.code === targetLanguage) || null
-    const targetLanguageName = selectedTarget?.name || ''
-
     if (!selectedFile || isSubmitting) {
       return
     }
-    if (!targetLanguageName) {
+    if (!targetLanguage) {
       setStatusMessage('Please select a target language.')
       return
     }
 
     const formData = new FormData()
     formData.append('file', selectedFile)
-    formData.append('targetLanguage', targetLanguageName)
+    formData.append('targetLanguage', targetLanguage)
 
     setIsSubmitting(true)
     setStatusMessage('Starting translation...')
@@ -199,24 +197,20 @@ function App() {
       const response = await fetch(`${apiBaseUrl}/api/translation-jobs`, {
         method: 'POST',
         body: formData,
-        // Don't set Content-Type header; browser sets it automatically with boundary for FormData
       })
 
-      // Handle network/CORS errors (response is null/undefined or fetch throws)
       if (!response) {
         throw new Error('Network error: Could not reach the server. Check your connection and try again.')
       }
 
       const payload = await response.json().catch(() => null)
-      
-      // Handle 202 Accepted (async job created)
+
       if (response.status === 202) {
         const newJobId = payload?.data?.jobId
         if (newJobId) {
           setJobId(newJobId)
           setStatusMessage('Translation job created. Processing...')
-          
-          // Start polling immediately, then every 2 seconds
+
           pollJobStatus(newJobId)
           pollingIntervalRef.current = setInterval(() => {
             pollJobStatus(newJobId)
@@ -227,13 +221,11 @@ function App() {
         return
       }
 
-      // Handle other responses (for backward compatibility if needed)
       if (!response.ok) {
         const errorMessage = payload?.message || `Server error (${response.status}). Please try again.`
         throw new Error(errorMessage)
       }
 
-      // Legacy synchronous response handling (shouldn't happen with new backend)
       const apiMessage = payload?.message || 'Translation completed.'
       const contentBase64 = payload?.data?.contentBase64
       const outputFileName = payload?.data?.outputFileName || 'translated.srt'
@@ -259,15 +251,14 @@ function App() {
       <header className="app__header">
         <h1>Subtitle Translator</h1>
         <p className="app__summary">
-          Welcome to the Subtitle Translator UI.
-          This clean workspace lets you prepare a single subtitle file for translation.
-          Select an `.srt` file and the backend will translate its entries before returning the translated subtitle.
+          Translate an `.srt` subtitle file with DeepL.
+          Choose a target language, upload your file, and download the translated subtitles.
         </p>
       </header>
 
       <section className="app__panel">
         <h2>Translate a subtitle file</h2>
-        <p className="app__hint">Choose an `.srt` file to begin.</p>
+        <p className="app__hint">Choose an `.srt` file and a DeepL target language to begin.</p>
         <label className="file-picker" htmlFor="srt-file">
           <span className="file-picker__label">Subtitle file</span>
           <input id="srt-file" name="srt-file" type="file" accept=".srt" onChange={handleFileChange} />
@@ -279,28 +270,28 @@ function App() {
             name="target-language"
             value={targetLanguage}
             onChange={(event) => setTargetLanguage(event.target.value)}
-            disabled={countriesStatus !== 'ready'}
+            disabled={languagesStatus !== 'ready'}
           >
-            {countriesStatus === 'loading' ? <option value="">Loading…</option> : null}
-            {countriesStatus === 'error' ? <option value="">Failed to load</option> : null}
-            {countriesStatus === 'ready'
-              ? countryOptions.map((option) => (
+            {languagesStatus === 'loading' ? <option value="">Loading languages…</option> : null}
+            {languagesStatus === 'error' ? <option value="">Failed to load languages</option> : null}
+            {languagesStatus === 'ready'
+              ? languageOptions.map((option) => (
                   <option key={option.code} value={option.code}>
-                    {option.name}
+                    {option.name} ({option.code})
                   </option>
                 ))
               : null}
           </select>
-          {countriesError ? <span className="field-error">{countriesError}</span> : null}
+          {languagesError ? <span className="field-error">{languagesError}</span> : null}
         </label>
         <div className="action-row">
           <button
             className="primary-button"
             type="button"
             onClick={handleStartTranslation}
-            disabled={!selectedFile || isSubmitting || countriesStatus !== 'ready' || !targetLanguage}
+            disabled={!selectedFile || isSubmitting || languagesStatus !== 'ready' || !targetLanguage}
           >
-            {isSubmitting 
+            {isSubmitting
               ? (jobStatus === 'PROCESSING' ? 'Translating...' : jobStatus === 'PENDING' ? 'Queued...' : 'Starting...')
               : 'Start translation'}
           </button>
@@ -312,8 +303,8 @@ function App() {
         {jobStatus === 'PROCESSING' && translatedEntries !== null && totalEntries !== null && totalEntries > 0 ? (
           <div className="progress-container">
             <div className="progress-bar-wrapper">
-              <div 
-                className="progress-bar-fill" 
+              <div
+                className="progress-bar-fill"
                 style={{ width: `${Math.min(100, Math.max(0, (translatedEntries / totalEntries) * 100))}%` }}
               />
             </div>

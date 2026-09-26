@@ -112,7 +112,7 @@ class TranslationJobServiceImplTest {
                 """);
 
         when(translator.translateBatch(anyList(), eq("EN")))
-                .thenThrow(new IOException("boom"));
+                .thenThrow(new IllegalStateException("boom"));
 
         CompletionException thrown = assertThrows(
                 CompletionException.class,

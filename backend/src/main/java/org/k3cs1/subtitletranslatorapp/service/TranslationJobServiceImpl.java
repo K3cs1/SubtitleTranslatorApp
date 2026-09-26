@@ -10,7 +10,6 @@ import org.k3cs1.subtitletranslatorapp.parser.SrtIOParser;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,8 +30,8 @@ public class TranslationJobServiceImpl implements TranslationJobService {
     private int batchSize;
 
     /**
-     * Safety cap to avoid creating oversized prompts for the LLM.
-     * This is an approximate character budget of the user payload (markers + entry text).
+     * Safety cap to avoid oversized DeepL requests.
+     * Approximate character budget of subtitle entry text in a batch.
      */
     @Value("${translation.max-batch-chars:12000}")
     private int maxBatchChars;
@@ -105,9 +104,6 @@ public class TranslationJobServiceImpl implements TranslationJobService {
                     Thread.currentThread().interrupt();
                     log.error(ie.getMessage());
                     throw new TranslationFailedException(ie.getMessage());
-                } catch (IOException ioe) {
-                    log.error(ioe.getMessage());
-                    throw new TranslationFailedException(ioe.getMessage());
                 } finally {
                     if (acquired) {
                         semaphore.release();
