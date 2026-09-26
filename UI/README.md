@@ -23,7 +23,7 @@ UI dev server: `http://localhost:5173`
 
 ## What the UI does
 
-- Loads “Target language” options from the backend:
-  - `GET /api/reference/countries`
-- Uploads an `.srt` file + selected target language to translate:
+- Loads DeepL target-language options from the backend:
+  - `GET /api/reference/countries` (returns `{ code, name }` language options)
+- Uploads an `.srt` file + selected DeepL language code to translate:
   - `POST /api/translation-jobs` (multipart/form-data with `file` and `targetLanguage`)

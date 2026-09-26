@@ -15,55 +15,20 @@ public class SubtitleTranslatorApp {
 
     /**
      * Elastic Beanstalk env vars can be present-but-empty.
-     * Spring AI (OpenAI) fails-fast if the resolved key is blank, preventing the web server from starting,
-     * which then causes Nginx upstream 502 (connection refused).
-     *
-     * We force a non-blank property so the application can start and serve health endpoints;
-     * translation will still fail until valid secrets are configured.
+     * We force a non-blank DeepL auth property so the application can start and serve health endpoints;
+     * translation will still fail until a valid DEEPL_API_KEY is configured.
      */
     private static void ensureNonBlankExternalApiKeys() {
-        ensureNonBlankPropertyFromEnv("OPENAI_API_KEY", "spring.ai.openai.api-key", "DUMMY_OPENAI_API_KEY");
+        ensureNonBlankPropertyFromEnv("DEEPL_API_KEY", "deepl.auth-key", "DUMMY_DEEPL_API_KEY");
     }
 
     private static void ensureNonBlankPropertyFromEnv(String envVarName, String propertyName, String fallbackValue) {
         String raw = System.getenv(envVarName);
         if (raw != null && raw.isBlank()) {
-            // System properties override application.yml/env and are available during auto-configuration.
             if (System.getProperty(propertyName) == null) {
                 System.setProperty(propertyName, fallbackValue);
                 log.warn("{} is set but blank. Using a dummy value for {} so the app can start.", envVarName, propertyName);
             }
         }
     }
-
-//    @Bean
-//    ApplicationRunner runner(TranslationJobService jobs) {
-//        return args -> {
-//            System.out.println("Enter path to .srt file: ");
-//            try (var scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
-//                String raw = scanner.nextLine().trim();
-//                Path input = Path.of(raw);
-//
-//                if (!Files.exists(input) || !Files.isRegularFile(input) || !raw.toLowerCase().endsWith(".srt")) {
-//                    log.error("Invalid input. Provide an existing .srt file path.");
-//                    return;
-//                }
-//
-//                var future = jobs.translateInBackground(new TranslationJobRequest(input));
-//
-//                // Don’t block the main thread; just attach callbacks
-//                future.whenComplete((out, ex) -> {
-//                    if (ex != null) {
-//                        log.error("Translation failed: {}", ex.getMessage());
-//                    } else {
-//                        log.info("Done! Saved to: {}", out.toAbsolutePath());
-//                    }
-//                });
-//
-//                log.info("Translation started in background.");
-//                log.info("You can keep this process running until completion.");
-//            }
-//        };
-//    }
-
 }

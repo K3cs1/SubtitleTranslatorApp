@@ -1,10 +1,4 @@
 spring:
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:OPENAI_API_KEY}
-      chat:
-        model: gpt-4o-mini
-        temperature: 0.0
   servlet:
     multipart:
       max-file-size: 2MB
@@ -22,9 +16,9 @@ deepl:
   base-url: ${DEEPL_BASE_URL:https://api-free.deepl.com}
   auth-key: ${DEEPL_API_KEY:DEEPL_API_KEY}
 translation:
-  # Upper bound on number of entries per OpenAI request (actual batch may be smaller due to max-batch-chars).
-  batch-size: 60
-  # Safety cap to avoid oversized prompts; tune up/down based on your subtitles/model limits.
+  # Upper bound on number of subtitle entries per DeepL request (actual batch may be smaller due to max-batch-chars).
+  batch-size: 50
+  # Safety cap to avoid oversized DeepL payloads; tune up/down based on subtitle density.
   max-batch-chars: 12000
   max-parallel: 5
 logging:
